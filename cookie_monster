@@ -2,8 +2,8 @@
 #
 # cookie_monister - get (lots) cookies form a URL(s)
 #
-# @(#) $Revision: 1.3 $
-# @(#) $Id: cookie_monster,v 1.3 2002/08/27 00:58:11 chongo Exp $
+# @(#) $Revision: 1.4 $
+# @(#) $Id: cookie_monster,v 1.4 2002/11/09 09:57:57 chongo Exp chongo $
 # @(#) $Source: /usr/local/src/cmd/cookie_monster/RCS/cookie_monster,v $
 #
 # Copyright (c) 2002 by Landon Curt Noll.  All Rights Reserved.
@@ -42,7 +42,7 @@ use Time::HiRes qw( time );
 
 # version - RCS style *and* usable by MakeMaker
 #
-my $VERSION = substr q$Revision: 1.3 $, 10;
+my $VERSION = substr q$Revision: 1.4 $, 10;
 $VERSION =~ s/\s+$//;
 
 # command usage
@@ -70,9 +70,13 @@ HTTP Example:
 
 HTTPS Example:
 
-    stunnel -D 0 -f -c -d 2000 -r www.host.com:443 &
+    nohup stunnel -D 0 -f -c -d 2000 -r www.host.com:443 &
     $0 -t -p 2000 -n 100000 -f www.host.com \\\
     	127.0.0.1 /app/login.html > out 2>&1
+
+HTTPS Login Post Example:
+    nohup stunnel -f -c -d 127.0.0.1:8088 -r www.host.com:443 &
+    $0 -t -p 8088 -n 100000 -f www.host.com -P 'login=username&pass=password&submit=Log+On' 127.0.0.1 /path/login.html
 };
 
 # cached values
