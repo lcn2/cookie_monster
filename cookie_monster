@@ -2,8 +2,8 @@
 #
 # cookie_monister - get (lots) cookies form a URL(s)
 #
-# @(#) $Revision: 1.4 $
-# @(#) $Id: cookie_monster,v 1.4 2002/11/09 09:57:57 chongo Exp chongo $
+# @(#) $Revision: 1.5 $
+# @(#) $Id: cookie_monster,v 1.5 2003/01/08 11:28:23 chongo Exp chongo $
 # @(#) $Source: /usr/local/src/cmd/cookie_monster/RCS/cookie_monster,v $
 #
 # Copyright (c) 2002 by Landon Curt Noll.  All Rights Reserved.
@@ -34,6 +34,7 @@
 # usages
 #
 use strict;
+use bytes;
 use vars qw($opt_v $opt_p $opt_c $opt_n $opt_s $opt_f $opt_t $opt_a $opt_P);
 use Socket;
 use Getopt::Std;
@@ -42,7 +43,7 @@ use Time::HiRes qw( time );
 
 # version - RCS style *and* usable by MakeMaker
 #
-my $VERSION = substr q$Revision: 1.4 $, 10;
+my $VERSION = substr q$Revision: 1.5 $, 10;
 $VERSION =~ s/\s+$//;
 
 # command usage
