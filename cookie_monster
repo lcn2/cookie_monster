@@ -1,0 +1,316 @@
+#!/usr/bin/perl -w
+#
+# cookie_monister - get (lots) cookies form a URL(s)
+#
+# @(#) $Revision$
+# @(#) $Id$
+# @(#) $Source$
+#
+# Copyright (c) 2002 by Landon Curt Noll.  All Rights Reserved.
+#
+# Permission to use, copy, modify, and distribute this software and
+# its documentation for any purpose and without fee is hereby granted,
+# provided that the above copyright, this permission notice and text
+# this comment, and the disclaimer below appear in all of the following:
+#
+#       supporting documentation
+#       source copies
+#       source works derived from this source
+#       binaries derived from this source or from derived source
+#
+# LANDON CURT NOLL DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
+# INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO
+# EVENT SHALL LANDON CURT NOLL BE LIABLE FOR ANY SPECIAL, INDIRECT OR
+# CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF
+# USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+# OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+# PERFORMANCE OF THIS SOFTWARE.
+#
+# chongo (Landon Curt Noll, http://www.isthe.com/chongo/index.html) /\oo/\
+#
+# Share and enjoy! :-)
+
+
+# usages
+#
+use strict;
+use vars qw($opt_v $opt_p $opt_c $opt_n $opt_s $opt_f $opt_t $opt_a);
+use Socket;
+use Getopt::Std;
+use Sys::Hostname;
+use Time::HiRes qw( time );
+
+# version - RCS style *and* usable by MakeMaker
+#
+my $VERSION = substr q$Revision: 1.1 $, 10;
+$VERSION =~ s/\s+$//;
+
+# command usage
+#
+my $usage = "$0 [-p port] [-v level] [-c cookie_name] [-n count]\n" .
+	    "\t[-s] [-f fake_host] [-t] [-a] host path";
+my $help = qq{$usage
+
+    -p port		port to connect to (def: 80)
+    -v level		verbosity level (def: 0, 5 == max)
+    -c cookie_name	only extract a cookie with the cookie_name (def: any)
+    -n count		number of cookes (def: 1)
+    -f fake_host	force HTTP Host: to be fake_host (def: host)
+    -s			strip extra HTTP text from cookie line (def: raw line)
+    -t			timestamp cookie fetches (def: do not)
+    -a			read all of the reply (def: HTTP headers only)
+
+    host		host web server to connect
+    path		URL path on the user to GET
+
+HTTP Example:
+
+    $0 -n 100000 www.host.com /app/login.html > out
+
+HTTPS Example:
+
+    stunnel -f -c -d 2000 -r www.host.com:443 &
+    $0 -p 2000 -n 100000 -f www.host.com \\\
+    	localhost /app/login.html > out
+};
+
+# cached values
+#
+my $cached_hname;       # cached protocol name (usually TCP)
+my $cached_pname;       # cached protocol name (usually TCP)
+my $cached_proto;       # cached protocol (usually tcp)
+my $cached_portnum;	# cached web server port number
+my $cached_iaddr;       # cached internet address of $host
+my $cached_dotquad;     # cached internet a.b.c.d string
+my $ok_cache = 0;	# 1 ==> cache values setup
+
+# forward declarations
+#
+sub raw_open($$);
+sub raw_reopen();
+
+# main
+#
+MAIN:
+{
+    my $port;		# web server port
+    my $host;		# hostname of server
+    my $path;		# path on server from WWW root
+    my $line;		# a line from the server
+    my $socket;		# opened socket handle
+    my $count;		# number of cookie fetches to make
+    my $host_param;	# HTTP Host: parameter to use
+    my $i;
+
+    # setup
+    #
+    $opt_v = 0;
+    $port = 80;		# default HTTP port
+    $count = 1;
+    select(STDOUT);
+    $| = 1;
+
+    # parse args
+    #
+    if (!getopts('v:p:c:n:f:sta') ||
+        ! defined $ARGV[0] || ! defined $ARGV[1]) {
+	die "$help\n";
+    }
+    ($port = $opt_p) if $opt_p;
+    ($count = $opt_n) if $opt_n;
+    $host =  $ARGV[0];
+    $path =  $ARGV[1];
+    if (defined $opt_f) {
+    	$host_param = $opt_f;
+    } else {
+    	$host_param = $host;
+    }
+    if ($opt_v > 1) {
+	print "DEBUG: host: $host\n";
+	print "DEBUG: port: $port\n";
+	print "DEBUG: path: $path\n";
+	print "DEBUG: count: $count\n";
+	print "DEBUG: host_param: $host_param\n";
+    }
+
+    # fetch cookies multiple times
+    #
+    for ($i = 0; $i < $count; ++$i) {
+
+	# open (or reopen) a connection to the server
+	#
+	if ($i == 0) {
+	    $socket = raw_open($host, $port);
+	} else {
+	    $socket = raw_reopen();
+	}
+
+	# write request to the server
+	#
+	print $socket "GET $path HTTP/1.1\nHost: $host_param\n\n" or
+	  die "bad HTTP write: $!\n";
+
+	# read reply until EOF
+	#
+	while (defined($line = <$socket>)) {
+
+	    # print line if debugging
+	    #
+	    if ($opt_v > 4) {
+		print "DEBUG: $line";
+	    }
+
+	    # unless -a, stop after HTTP header has been read
+	    #
+	    if (! defined $opt_a && $line =~ /^\s*$/) {
+	    	last;
+	    }
+
+	    # if given -c and wrong cookie, ignore it
+	    # without -c, ignore non-cookie lines
+	    #
+	    if (defined $opt_c) {
+		next if $line !~ /^Set-Cookie: $opt_c=/;
+	    } else {
+		next if $line !~ /^Set-Cookie: /;
+	    }
+
+	    # print cookle
+	    #
+	    # We strip down to just the cookie value if -s
+	    #
+	    if ($opt_s) {
+		$line =~ s/^Set-Cookie: [^=]+=//;
+		$line =~ s/;.*//;
+	    }
+	    if ($opt_t) {
+	        print time, ": ";
+	    }
+	    print "$line";
+	}
+
+	# close connection to server
+	#
+	close $socket;
+    }
+}
+
+
+# raw_open - open a socket to a port on a host
+#
+# usage:
+#       raw_open($hostname, $port);
+#
+#       $hostname       hostname of server
+#       $port           port on server to connect to
+#
+# returns:
+#	handle
+#
+# NOTE: The side effect of this call is that the $cached_* files are
+#	defined and $ok_cache is set to 1.
+#
+sub raw_open($$)
+{
+    my ($hostname, $port) = @_;    # get args
+    my ($a,$b,$c,$d);           # IP quad address parts
+    my $oldfh;          # prevoiusly selected file handle
+    my $pname;          # cached protocol name (usually TCP)
+    my $proto;          # cached protocol (usually tcp)
+    my $portnum;	# cached web server port number
+    my $iaddr;          # cached internet address of $host
+    my $fh;		# socket to open
+
+    # determine the port and protocol
+    #
+    if ($port =~ /^\d+$/) {
+        $proto = 6;	# TCP
+	$portnum = $port;
+	$pname = "tcp";
+    } else {
+	(undef, undef, $portnum, $pname) = getservbyname($port, "tcp") or
+	   die "getservbyname: $!";
+	$proto = getprotobyname($pname);
+    }
+    if ($opt_v > 3) {
+	print "DEBUG: proto: $proto\n";
+	print "DEBUG: pname: $proto\n";
+    }
+
+    # determine host address
+    #
+    $iaddr = gethostbyname($hostname) or die "gethostbyname: $!";
+    ($a, $b, $c, $d) = unpack('C4', $iaddr);
+    if ($opt_v > 3) {
+        print "DEBUG: using $hostname($a.$b.$c.$d) port $portnum($pname)\n";
+    }
+
+    # open a socket to the given port
+    #
+    socket($fh, PF_INET, SOCK_STREAM, $proto) or die "socket: $!";
+    setsockopt($fh, SOL_SOCKET, SO_REUSEADDR, pack("l",1)) or
+        die "setsockopt: $!";
+    print "DEBUG: connect $hostname($a.$b.$c.$d)/$portnum($pname)\n"
+        if ($opt_v > 3);
+    connect($fh, sockaddr_in($portnum,$iaddr)) or
+        die "connect: $hostname($portnum): $!";
+    if ($opt_v > 2) {
+	print "DEBUG: opened $hostname($a.$b.$c.$d) port $portnum($pname)\n";
+    }
+
+    # make the socket unbuffered
+    #
+    $oldfh = select($fh);
+    $| = 1;
+    select($oldfh);
+
+    # cache values
+    #
+    $cached_hname = $hostname;
+    $cached_pname = $pname;
+    $cached_proto = $proto;
+    $cached_portnum = $portnum;
+    $cached_iaddr = $iaddr;
+    $cached_dotquad = "$a.$b.$c.$d";
+    $ok_cache = 1;
+
+    # return socket
+    #
+    return $fh;
+}
+
+# raw_reopen - reopen a previously opened socket
+#
+sub raw_reopen()
+{
+    my $fh;		# socket to open
+    my $oldfh;          # prevoiusly selected file handle
+
+    # firewall
+    #
+    die "must call raw_open first\n" if (!defined $ok_cache || ! $ok_cache);
+
+    # open a socket to the given port
+    #
+    socket($fh, PF_INET, SOCK_STREAM, $cached_proto) or die "socket: $!";
+    setsockopt($fh, SOL_SOCKET, SO_REUSEADDR, pack("l",1)) or
+        die "setsockopt: $!";
+    print "DEBUG: connect $cached_hname($cached_dotquad)/" .
+    	  "$cached_portnum($cached_pname)\n" if ($opt_v > 3);
+    connect($fh, sockaddr_in($cached_portnum,$cached_iaddr)) or
+        die "connect: $cached_hname($cached_portnum): $!";
+    if ($opt_v > 2) {
+	print "DEBUG: opened  $cached_hname($cached_dotquad)/" .
+	      "$cached_portnum($cached_pname)\n" if ($opt_v > 3);
+    }
+
+    # make the socket unbuffered
+    #
+    $oldfh = select($fh);
+    $| = 1;
+    select($oldfh);
+
+    # return socket
+    #
+    return $fh;
+}
