@@ -2,9 +2,9 @@
 #
 # cookie_monister - get (lots) cookies form a URL(s)
 #
-# @(#) $Revision$
-# @(#) $Id$
-# @(#) $Source$
+# @(#) $Revision: 1.1 $
+# @(#) $Id: cookie_monster,v 1.1 2002/08/16 21:38:54 chongo Exp chongo $
+# @(#) $Source: /usr/local/src/cmd/cookie_monster/RCS/cookie_monster,v $
 #
 # Copyright (c) 2002 by Landon Curt Noll.  All Rights Reserved.
 #
@@ -57,7 +57,7 @@ my $help = qq{$usage
     -n count		number of cookes (def: 1)
     -f fake_host	force HTTP Host: to be fake_host (def: host)
     -s			strip extra HTTP text from cookie line (def: raw line)
-    -t			timestamp cookie fetches (def: do not)
+    -t			timestamp cookie fetches <<recommeded>> (def: do not)
     -a			read all of the reply (def: HTTP headers only)
 
     host		host web server to connect
@@ -65,13 +65,13 @@ my $help = qq{$usage
 
 HTTP Example:
 
-    $0 -n 100000 www.host.com /app/login.html > out
+    $0 -t -n 100000 www.host.com /app/login.html > out 2>&1
 
 HTTPS Example:
 
     stunnel -f -c -d 2000 -r www.host.com:443 &
-    $0 -p 2000 -n 100000 -f www.host.com \\\
-    	localhost /app/login.html > out
+    $0 -t -p 2000 -n 100000 -f www.host.com \\\
+    	127.0.0.1 /app/login.html > out 2>&1
 };
 
 # cached values
