@@ -2,8 +2,8 @@
 #
 # cookie_monister - get (lots) cookies form a URL(s)
 #
-# @(#) $Revision: 1.2 $
-# @(#) $Id: cookie_monster,v 1.2 2002/08/16 22:00:31 chongo Exp chongo $
+# @(#) $Revision: 1.3 $
+# @(#) $Id: cookie_monster,v 1.3 2002/08/27 00:58:11 chongo Exp $
 # @(#) $Source: /usr/local/src/cmd/cookie_monster/RCS/cookie_monster,v $
 #
 # Copyright (c) 2002 by Landon Curt Noll.  All Rights Reserved.
@@ -34,7 +34,7 @@
 # usages
 #
 use strict;
-use vars qw($opt_v $opt_p $opt_c $opt_n $opt_s $opt_f $opt_t $opt_a);
+use vars qw($opt_v $opt_p $opt_c $opt_n $opt_s $opt_f $opt_t $opt_a $opt_P);
 use Socket;
 use Getopt::Std;
 use Sys::Hostname;
@@ -42,13 +42,13 @@ use Time::HiRes qw( time );
 
 # version - RCS style *and* usable by MakeMaker
 #
-my $VERSION = substr q$Revision: 1.2 $, 10;
+my $VERSION = substr q$Revision: 1.3 $, 10;
 $VERSION =~ s/\s+$//;
 
 # command usage
 #
 my $usage = "$0 [-p port] [-v level] [-c cookie_name] [-n count]\n" .
-	    "\t[-s] [-f fake_host] [-t] [-a] host path";
+	    "\t[-s] [-f fake_host] [-t] [-a] [-P post_string] host path";
 my $help = qq{$usage
 
     -p port		port to connect to (def: 80)
@@ -59,6 +59,7 @@ my $help = qq{$usage
     -s			strip extra HTTP text from cookie line (def: raw line)
     -t			timestamp cookie fetches <<recommeded>> (def: do not)
     -a			read all of the reply (def: HTTP headers only)
+    -P post_string	issue a POST this this string instead of a GET
 
     host		host web server to connect
     path		URL path on the user to GET
@@ -69,7 +70,7 @@ HTTP Example:
 
 HTTPS Example:
 
-    stunnel -f -c -d 2000 -r www.host.com:443 &
+    stunnel -D 0 -f -c -d 2000 -r www.host.com:443 &
     $0 -t -p 2000 -n 100000 -f www.host.com \\\
     	127.0.0.1 /app/login.html > out 2>&1
 };
@@ -100,6 +101,9 @@ MAIN:
     my $socket;		# opened socket handle
     my $count;		# number of cookie fetches to make
     my $host_param;	# HTTP Host: parameter to use
+    my $linenum;	# GET reply line number
+    my $continue;	# 1 ==> skip until blank line
+    my $reply_seen;	# 1 ==> HTTP reply seen
     my $i;
 
     # setup
@@ -112,7 +116,7 @@ MAIN:
 
     # parse args
     #
-    if (!getopts('v:p:c:n:f:sta') ||
+    if (!getopts('v:p:c:n:f:staP:') ||
         ! defined $ARGV[0] || ! defined $ARGV[1]) {
 	die "$help\n";
     }
@@ -131,6 +135,9 @@ MAIN:
 	print "DEBUG: path: $path\n";
 	print "DEBUG: count: $count\n";
 	print "DEBUG: host_param: $host_param\n";
+        if (defined $opt_P) {
+	    print "DEBUG: post_string: $opt_P\n";
+	}
     }
 
     # fetch cookies multiple times
@@ -147,23 +154,58 @@ MAIN:
 
 	# write request to the server
 	#
-	print $socket "GET $path HTTP/1.1\nHost: $host_param\n\n" or
-	  die "bad HTTP write: $!\n";
+	if (defined $opt_P) {
+	    print "DEBUG: POST $path HTTP/1.1 \\n Host: $host_param \\n Content-Type: " .
+	    	  "application/x-www-form-urlencoded \\n Content-Length: ", 
+		  length($opt_P), " \\n $opt_P\n" if $opt_v > 2;
+	    print $socket "POST $path HTTP/1.1\nHost: $host_param\nContent-Type: " .
+	    	  	  "application/x-www-form-urlencoded\nContent-Length: ", 
+			  length($opt_P), "\n\n$opt_P" or
+	      die "bad HTTP write: $!\n";
+	} else {
+	    print "DEBUG: GET $path HTTP/1.1 \\n Host: $host_param\n" if $opt_v > 2;
+	    print $socket "GET $path HTTP/1.1\nHost: $host_param\n\n" or
+	      die "bad HTTP write: $!\n";
+	}
 
 	# read reply until EOF
 	#
+	$linenum = 0;
+	$continue = 0;
+	$reply_seen = 0;
 	while (defined($line = <$socket>)) {
 
 	    # print line if debugging
 	    #
+	    ++$linenum;
 	    if ($opt_v > 4) {
-		print "DEBUG: $line";
+		print "DEBUG: $linenum: $line";
+	    }
+
+	    # if the host says 'HTTP/\w+ 100 Continue', then we will skip until
+	    # a blank line
+	    #
+	    if ($reply_seen == 0 && $line =~ m:^HTTP/\S+ 100 Continue:i) {
+		print "DEBUG: start of 100 Continue skip\n" if $opt_v > 3;
+		$continue = 1;
+	    }
+
+	    # look for the HTTP reply
+	    # 
+	    if ($reply_seen == 0 && $line =~ m:HTTP/\w+ \d{3} :) {
+		print "DEBUG: HTTP reply seen\n" if $opt_v > 3;
+		$reply_seen = 1;
 	    }
 
 	    # unless -a, stop after HTTP header has been read
 	    #
 	    if (! defined $opt_a && $line =~ /^\s*$/) {
-	    	last;
+		if ($continue == 1) {
+		    print "DEBUG: end of 100 Continue skip\n" if $opt_v > 3;
+		    $continue = 0;
+		} else {
+		    last;
+		}
 	    }
 
 	    # if given -c and wrong cookie, ignore it
