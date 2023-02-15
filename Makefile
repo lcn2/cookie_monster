@@ -2,9 +2,9 @@
 #
 # cookie_monister - get (lots) cookies form a URL(s)
 #
-# @(#) $Revision: 1.4 $
-# @(#) $Id: Makefile,v 1.4 2000/10/24 05:10:06 chongo Exp $
-# @(#) $Source: /usr/local/src/cmd/ipv4util/RCS/Makefile,v $
+# @(#) $Revision: 1.1 $
+# @(#) $Id: Makefile,v 1.1 2002/08/16 21:40:35 chongo Exp $
+# @(#) $Source: /usr/local/src/bin/cookie_monster/RCS/Makefile,v $
 #
 # Copyright (c) 2000 by Landon Curt Noll.  All Rights Reserved.
 #
