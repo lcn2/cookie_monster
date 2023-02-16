@@ -1,10 +1,6 @@
-#!/usr/bin/perl -w
+#!/usr/bin/env perl -w
 #
 # cookie_monster - get lots cookies form URLs
-#
-# @(#) $Revision: 1.6 $
-# @(#) $Id: cookie_monster,v 1.6 2004/05/21 15:02:39 chongo Exp $
-# @(#) $Source: /usr/local/src/bin/cookie_monster/RCS/cookie_monster,v $
 #
 # Copyright (c) 2002,2023 by Landon Curt Noll.  All Rights Reserved.
 #
