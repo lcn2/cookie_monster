@@ -26,7 +26,7 @@
 #
 # Share and enjoy!
 
-SHELL=/bin/sh
+SHELL= bash
 BINMODE= 0555
 DESTDIR= /usr/local/bin
 INSTALL= install
