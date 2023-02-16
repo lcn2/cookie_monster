@@ -1,6 +1,6 @@
 #!/usr/bin/env make
 #
-# cookie_monster - get lots cookies form a URLs
+# cookie_monster - get lots cookies form URLs
 #
 # Copyright (c) 2000,2023 by Landon Curt Noll.  All Rights Reserved.
 #

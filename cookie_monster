@@ -1,12 +1,12 @@
 #!/usr/bin/perl -w
 #
-# cookie_monster - get lots cookies form a URLs
+# cookie_monster - get lots cookies form URLs
 #
 # @(#) $Revision: 1.6 $
 # @(#) $Id: cookie_monster,v 1.6 2004/05/21 15:02:39 chongo Exp $
 # @(#) $Source: /usr/local/src/bin/cookie_monster/RCS/cookie_monster,v $
 #
-# Copyright (c) 2002 by Landon Curt Noll.  All Rights Reserved.
+# Copyright (c) 2002,2023 by Landon Curt Noll.  All Rights Reserved.
 #
 # Permission to use, copy, modify, and distribute this software and
 # its documentation for any purpose and without fee is hereby granted,
@@ -73,7 +73,7 @@ HTTPS Example:
 
     nohup stunnel -D 0 -f -c -d 2000 -r www.host.com:443 &
     $0 -t -p 2000 -n 100000 -f www.host.com \\\
-    	127.0.0.1 /app/login.html > out 2>&1
+	127.0.0.1 /app/login.html > out 2>&1
 
 HTTPS Login Post Example:
     nohup stunnel -f -c -d 127.0.0.1:8088 -r www.host.com:443 &
@@ -130,9 +130,9 @@ MAIN:
     $host =  $ARGV[0];
     $path =  $ARGV[1];
     if (defined $opt_f) {
-    	$host_param = $opt_f;
+	$host_param = $opt_f;
     } else {
-    	$host_param = $host;
+	$host_param = $host;
     }
     if ($opt_v > 1) {
 	print "DEBUG: host: $host\n";
@@ -161,10 +161,10 @@ MAIN:
 	#
 	if (defined $opt_P) {
 	    print "DEBUG: POST $path HTTP/1.1 \\n Host: $host_param \\n Content-Type: " .
-	    	  "application/x-www-form-urlencoded \\n Content-Length: ", 
+		  "application/x-www-form-urlencoded \\n Content-Length: ",
 		  length($opt_P), " \\n $opt_P\n" if $opt_v > 2;
 	    print $socket "POST $path HTTP/1.1\nHost: $host_param\nContent-Type: " .
-	    	  	  "application/x-www-form-urlencoded\nContent-Length: ", 
+			  "application/x-www-form-urlencoded\nContent-Length: ",
 			  length($opt_P), "\n\n$opt_P" or
 	      die "bad HTTP write: $!\n";
 	} else {
@@ -196,7 +196,7 @@ MAIN:
 	    }
 
 	    # look for the HTTP reply
-	    # 
+	    #
 	    if ($reply_seen == 0 && $line =~ m:HTTP/\w+ \d{3} :) {
 		print "DEBUG: HTTP reply seen\n" if $opt_v > 3;
 		$reply_seen = 1;
@@ -343,7 +343,7 @@ sub raw_reopen()
     setsockopt($fh, SOL_SOCKET, SO_REUSEADDR, pack("l",1)) or
         die "setsockopt: $!";
     print "DEBUG: connect $cached_hname($cached_dotquad)/" .
-    	  "$cached_portnum($cached_pname)\n" if ($opt_v > 3);
+	  "$cached_portnum($cached_pname)\n" if ($opt_v > 3);
     connect($fh, sockaddr_in($cached_portnum,$cached_iaddr)) or
         die "connect: $cached_hname($cached_portnum): $!";
     if ($opt_v > 2) {
