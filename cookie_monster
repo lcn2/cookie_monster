@@ -1,8 +1,8 @@
-#!/usr/bin/env perl -w
+#!/usr/bin/env perl
 #
-# cookie_monster - get lots cookies form URLs
+# cookie_monster - obtain cookies from a URL
 #
-# Copyright (c) 2002,2023 by Landon Curt Noll.  All Rights Reserved.
+# Copyright (c) 2000,2002-2004,2023,2025 by Landon Curt Noll.  All Rights Reserved.
 #
 # Permission to use, copy, modify, and distribute this software and
 # its documentation for any purpose and without fee is hereby granted,
@@ -22,74 +22,106 @@
 # OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 # PERFORMANCE OF THIS SOFTWARE.
 #
-# chongo (Landon Curt Noll, http://www.isthe.com/chongo/index.html) /\oo/\
+# chongo (Landon Curt Noll) /\oo/\
 #
-# Share and enjoy! :-)
+# http://www.isthe.com/chongo/index.html
+# https://github.com/lcn2
+#
+# Share and enjoy!  :-)
 
 
 # usages
 #
 use strict;
 use bytes;
-use vars qw($opt_v $opt_p $opt_c $opt_n $opt_s $opt_f $opt_t $opt_a $opt_P);
+use vars qw($opt_h $opt_v $opt_V $opt_p $opt_c $opt_n $opt_s $opt_f $opt_t $opt_a $opt_P);
 use Socket;
-use Getopt::Std;
+use Getopt::Long qw(:config no_ignore_case);
+use File::Basename;
 use Sys::Hostname;
 use Time::HiRes qw( time );
 
-# version - RCS style *and* usable by MakeMaker
-#
-my $VERSION = substr q$Revision: 1.6 $, 10;
-$VERSION =~ s/\s+$//;
 
-# command usage
+# version
 #
-my $usage = "$0 [-p port] [-v level] [-c cookie_name] [-n count]\n" .
+my $VERSION = "1.6.1 2025-04-09";
+
+
+# my vars
+#
+my $NAME = basename($0);
+
+
+# usage and help
+#
+my $usage = "$0 [-h] [-v level] [-V] [-p port] [-c cookie_name] [-n count]\n" .
 	    "\t[-s] [-f fake_host] [-t] [-a] [-P post_string] host path";
 my $help = qq{$usage
 
-    -p port		port to connect to (def: 80)
-    -v level		verbosity level (def: 0, 5 == max)
-    -c cookie_name	only extract a cookie with the cookie_name (def: any)
-    -n count		number of cookes (def: 1)
-    -f fake_host	force HTTP Host: to be fake_host (def: host)
-    -s			strip extra HTTP text from cookie line (def: raw line)
-    -t			timestamp cookie fetches <<recommeded>> (def: do not)
-    -a			read all of the reply (def: HTTP headers only)
-    -P post_string	issue a POST this this string instead of a GET
+    -h                  print help and exit
+    -v level            verbose / debug level
+    -V                  print version and exit
 
-    host		host web server to connect
-    path		URL path on the user to GET
+    -p port             port to connect to (def: 80)
+    -c cookie_name      only extract a cookie with the cookie_name (def: any)
+    -n count            number of cookes (def: 1)
+    -f fake_host        force HTTP Host: to be fake_host (def: host)
+    -s                  strip extra HTTP text from cookie line (def: raw line)
+    -t                  timestamp cookie fetches <<recommeded>> (def: do not)
+    -a                  read all of the reply (def: HTTP headers only)
+    -P post_string      issue a POST this this string instead of a GET
+
+    host                host web server to connect
+    path                URL path on the user to GET
 
 HTTP Example:
 
-    $0 -t -n 100000 www.host.com /app/login.html > out 2>&1
+    $NAME -t -n 100000 www.host.com /app/login.html > out 2>&1
 
 HTTPS Example:
 
     nohup stunnel -D 0 -f -c -d 2000 -r www.host.com:443 &
-    $0 -t -p 2000 -n 100000 -f www.host.com \\\
-	127.0.0.1 /app/login.html > out 2>&1
+
+    $NAME -t -p 2000 -n 100000 -f www.host.com 127.0.0.1 /app/login.html > out 2>&1
 
 HTTPS Login Post Example:
+
     nohup stunnel -f -c -d 127.0.0.1:8088 -r www.host.com:443 &
-    $0 -t -p 8088 -n 100000 -f www.host.com -P 'login=username&pass=password&submit=Log+On' 127.0.0.1 /path/login.html
-};
+
+    $NAME -t -p 8088 -n 100000 -f www.host.com -P 'login=username&pass=password&submit=Log+On' 127.0.0.1 /path/login.html
+
+$NAME version: $VERSION};
+my %optctl = (
+    "h" => \$opt_h,
+    "v=i" => \$opt_v,
+    "V" => \$opt_V,
+    "p=i" => \$opt_p,
+    "c=s" => \$opt_c,
+    "n=i" => \$opt_n,
+    "f=s" => \$opt_f,
+    "s" => \$opt_s,
+    "t" => \$opt_t,
+    "a" => \$opt_a,
+    "P=s" => \$opt_P,
+);
+
 
 # cached values
 #
 my $cached_hname;       # cached protocol name (usually TCP)
 my $cached_pname;       # cached protocol name (usually TCP)
-my $cached_proto;       # cached protocol (usually tcp)
+my $cached_proto;       # cached protocol (usually TCP)
 my $cached_portnum;	# cached web server port number
 my $cached_iaddr;       # cached internet address of $host
 my $cached_dotquad;     # cached internet a.b.c.d string
 my $ok_cache = 0;	# 1 ==> cache values setup
 
+
 # forward declarations
 #
 sub raw_open($$);
 sub raw_reopen();
+
 
 # main
 #
@@ -109,17 +141,31 @@ MAIN:
 
     # setup
     #
-    $opt_v = 0;
-    $port = 80;		# default HTTP port
-    $count = 1;
     select(STDOUT);
     $| = 1;
+    $opt_h = 0;
+    $opt_v = 0;
+    $opt_V = 0;
+    $port = 80;		# default HTTP port
+    $count = 1;
 
     # parse args
     #
-    if (!getopts('v:p:c:n:f:staP:') ||
-        ! defined $ARGV[0] || ! defined $ARGV[1]) {
-	die "$help\n";
+    if (!GetOptions(%optctl)) {
+	print STDERR "$0: invalid command line\nusage: $help";
+	exit(2);
+    }
+    if ($opt_h) {
+        print "$help\n";
+        exit(0);
+    }
+    if ($opt_V) {
+        print "$VERSION\n";
+        exit(0);
+    }
+    if ($#ARGV < 1) {
+	print STDERR "$0: missing command line arg(s)\nusage: $help";
+	exit(2);
     }
     ($port = $opt_p) if $opt_p;
     ($count = $opt_n) if $opt_n;
@@ -218,7 +264,7 @@ MAIN:
 		next if $line !~ /^Set-Cookie: /i;
 	    }
 
-	    # print cookle
+	    # print cookie
 	    #
 	    # We strip down to just the cookie value if -s
 	    #
@@ -327,7 +373,7 @@ sub raw_open($$)
 sub raw_reopen()
 {
     my $fh;		# socket to open
-    my $oldfh;          # prevoiusly selected file handle
+    my $oldfh;          # previously selected file handle
 
     # firewall
     #
